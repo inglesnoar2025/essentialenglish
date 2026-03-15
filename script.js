@@ -3,16 +3,31 @@
 // ===================================================================================
 const API_URL = "https://script.google.com/macros/s/AKfycbxUpj0SSUi4j9hheTxh-OYUssAN6_BHmQ_YWuelqgi7-hCrpGjU8uGe0boPiQ3MvUKzOQ/exec";
 
-// Motor de conexão com a API do Google (Netlify -> Google)
+// Motor de conexão com a API do Google (BLINDADO E COM TRIAGEM DE ERROS)
 async function apiCall(action, data) {
+    if (!navigator.onLine) {
+        console.error("❌ Erro: Usuário sem conexão de rede.");
+        return { success: false, msg: "ERR_OFFLINE" }; 
+    }
+
     try {
         let res = await fetch(API_URL, {
             method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({action: action, payload: {type: action, data: data, email: userEmailCache}})
         });
-        return await res.json();
+        
+        const textoBruto = await res.text();
+        
+        try {
+            return JSON.parse(textoBruto);
+        } catch (errParsing) {
+            console.error("❌ O Google bloqueou e devolveu HTML/Lixo:", textoBruto);
+            return { success: false, msg: "ERR_SERVER_BLOCK" }; 
+        }
     } catch(e) {
-        return {success: false, msg: "ERR_NET"};
+        console.error("❌ Falha de Fetch:", e);
+        return { success: false, msg: "ERR_FETCH_FAIL" }; 
     }
 }
 
@@ -41,16 +56,21 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+// --- VARIÁVEIS GLOBAIS DO SISTEMA (CORRIGIDAS PARA RECUPERAÇÃO DE SENHA) ---
 const urlParams = new URLSearchParams(window.location.search);
 const urlAction = urlParams.get('ac') || "";
+const urlEmail = urlParams.get('em') || ""; // <--- AGORA ELE PUXA O E-MAIL DO LINK!
 
 let I18N = {}; 
 let detectedLang = (navigator.language || "en").split("-")[0];
-let userEmailCache = ""; 
+let userEmailCache = urlEmail; // <--- SALVA O E-MAIL NA MEMÓRIA MESMO EM ABA NOVA
 const passRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$/;
 
 const FALLBACK = {
     "ERR_NET": "Sem internet. Verifique sua conexão.",
+    "ERR_OFFLINE": "Sem internet de verdade. Verifique seu Wi-Fi ou 4G.",
+    "ERR_SERVER_BLOCK": "O servidor bloqueou a conexão. O Google não retornou dados válidos.",
+    "ERR_FETCH_FAIL": "Falha ao alcançar o servidor da API.",
     "ERR_UNKNOWN": "Falha no sistema. Tente novamente."
 };
 
@@ -66,6 +86,8 @@ function initApp() {
         }
         if(!I18N[detectedLang]) I18N[detectedLang] = {};
         aplicarTraducoes(); 
+        
+        // Se a URL mandar abrir o reset, ele abre direto
         if (urlAction === 'reset') {
             show_sec('sec-reset');
         }
@@ -131,27 +153,27 @@ function show_sec(id) {
 
 function run_login(btn) {
     const e = document.getElementById('l-email').value, p = document.getElementById('l-pass').value;
-    const msgs = I18N[detectedLang] || I18N["en"];
+    const msgs = I18N[detectedLang] || I18N["en"] || FALLBACK;
 
-    if(!e || !p) return notify(msgs.EMPTY);
+    if(!e || !p) return notify(msgs.EMPTY || "Preencha tudo");
 
     btn.disabled = true; 
-    btn.innerText = msgs.WAIT;
+    btn.innerText = msgs.WAIT || "AGUARDE";
 
     apiCall('user_manager', {email: e, pass: p}).then(res => {
         btn.disabled = false; 
-        btn.innerText = msgs.b_login;
+        btn.innerText = msgs.b_login || "ENTRAR";
 
         if(res.success) {
             userEmailCache = res.user.email;
             document.getElementById('main-auth').style.display = 'none';
             document.getElementById('sec-dashboard').style.display = 'flex';
             document.body.style.alignItems = 'stretch';
-            document.getElementById('dash-welcome').innerText = msgs.HELLO + res.user.name + "!";
-            document.getElementById('dash-intro').innerText = msgs.INTRO;
+            document.getElementById('dash-welcome').innerText = (msgs.HELLO || "Olá ") + res.user.name + "!";
+            document.getElementById('dash-intro').innerText = msgs.INTRO || "";
             limparCampos(['l-email', 'l-pass']);
         } else {
-            let msgFinal = msgs[res.msg] || res.msg;
+            let msgFinal = msgs[res.msg] || res.msg || msgs.ERR_UNKNOWN || "Erro";
             if (res.remaining) { msgFinal = msgFinal.replace("{n}", res.remaining); }
             notify(msgFinal);
             limparCampos(['l-email', 'l-pass']);
@@ -164,7 +186,7 @@ function run_register(btn) {
     const e = document.getElementById('r-email').value.trim();
     const p = document.getElementById('r-pass').value;
     const p2 = document.getElementById('r-pass-confirm').value;
-    const msgs = I18N[detectedLang] || I18N["en"] || {};
+    const msgs = I18N[detectedLang] || I18N["en"] || FALLBACK;
 
     if(!n || !e || !p || !p2) return notify(msgs.EMPTY || "Preencha tudo");
     const nomePartes = n.split(/\s+/).filter(parte => parte.length >= 2);
@@ -174,7 +196,7 @@ function run_register(btn) {
     if(!passRegex.test(p)) return notify(msgs.WEAK_PASS || "Senha fraca");
 
     btn.disabled = true;
-    btn.innerText = msgs.WAIT || "...";
+    btn.innerText = msgs.WAIT || "AGUARDE";
 
     apiCall('user_manager', {name: n, email: e, pass: p, lang: detectedLang}).then(res => {
         btn.disabled = false;
@@ -194,19 +216,19 @@ function run_register(btn) {
 function run_forgot(btn) {
     const emailInput = document.getElementById('f-email');
     const e = emailInput.value.trim();
-    const msgs = I18N[detectedLang] || I18N["en"];
+    const msgs = I18N[detectedLang] || I18N["en"] || FALLBACK;
     
-    if(!e) return notify(msgs.EMPTY);
+    if(!e) return notify(msgs.EMPTY || "Preencha o e-mail");
     userEmailCache = e; 
     btn.disabled = true; 
-    btn.innerText = msgs.WAIT;
+    btn.innerText = msgs.WAIT || "AGUARDE";
 
     apiCall('user_manager', {email: e, lang: detectedLang}).then(res => {
         btn.disabled = false; 
-        btn.innerText = msgs.b_forgot;
+        btn.innerText = msgs.b_forgot || "RECUPERAR SENHA";
 
         if(res.success) { 
-            let msgFinal = msgs[res.msg] || msgs.SUCCESS_TOKEN; 
+            let msgFinal = msgs[res.msg] || msgs.SUCCESS_TOKEN || "Sucesso"; 
             if (res.remaining) msgFinal = msgFinal.replace("{n}", res.remaining);
             notify(msgFinal); 
             
@@ -215,7 +237,7 @@ function run_forgot(btn) {
                 closeModal(); show_sec('sec-reset'); okBtn.onclick = closeModal; 
             };
         } else {
-            let msgFinal = msgs[res.msg] || res.msg || "Error";
+            let msgFinal = msgs[res.msg] || res.msg || "Erro";
             if (res.remaining) { msgFinal = msgFinal.replace("{n}", res.remaining); }
             notify(msgFinal); 
 
@@ -233,25 +255,25 @@ function run_reset(btn) {
     const t = document.getElementById('rs-token').value;
     const p = document.getElementById('rs-pass').value;
     const c = document.getElementById('rs-pass-confirm').value;
-    const msgs = I18N[detectedLang] || I18N["en"];
+    const msgs = I18N[detectedLang] || I18N["en"] || FALLBACK;
 
-    if(!t || !p || !c) return notify(msgs.EMPTY);
-    if(p !== c) return notify(msgs.NO_MATCH);
-    if(!passRegex.test(p)) return notify(msgs.WEAK_PASS);
+    if(!t || !p || !c) return notify(msgs.EMPTY || "Preencha tudo");
+    if(p !== c) return notify(msgs.NO_MATCH || "Senhas não conferem");
+    if(!passRegex.test(p)) return notify(msgs.WEAK_PASS || "Senha fraca");
 
     btn.disabled = true; 
-    btn.innerText = msgs.WAIT;
+    btn.innerText = msgs.WAIT || "AGUARDE";
 
     apiCall('user_manager', {email: userEmailCache, token: t, new_pass: p}).then(res => {
         btn.disabled = false; 
-        btn.innerText = msgs.b_reset;
+        btn.innerText = msgs.b_reset || "REDEFINIR";
         
         if(res.success) { 
-            notify(msgs.SUCCESS); 
+            notify(msgs.SUCCESS || "Sucesso"); 
             limparCampos(['rs-token', 'rs-pass', 'rs-pass-confirm']); 
             show_sec('sec-login'); 
         } else {
-            let msgFinal = msgs[res.msg] || res.msg;
+            let msgFinal = msgs[res.msg] || res.msg || msgs.ERR_UNKNOWN || "Erro";
             if (res.remaining) { msgFinal = msgFinal.replace("{n}", res.remaining); }
             notify(msgFinal);
             limparCampos(['rs-token', 'rs-pass', 'rs-pass-confirm']);
@@ -265,7 +287,7 @@ function run_reset(btn) {
 }
 
 function notify(m) {
-    const msgs = I18N[detectedLang] || I18N["en"];
+    const msgs = I18N[detectedLang] || I18N["en"] || {};
     document.getElementById('modal-text').innerText = m;
     document.getElementById('modal-btn-ok').innerText = "OK";
     document.getElementById('modal-btn-confirm').style.display = "none";
@@ -273,8 +295,8 @@ function notify(m) {
 }
 
 function askLogout() {
-    const msgs = I18N[detectedLang] || I18N["en"];
-    document.getElementById('modal-text').innerText = msgs.LOGOUT_Q;
+    const msgs = I18N[detectedLang] || I18N["en"] || {};
+    document.getElementById('modal-text').innerText = msgs.LOGOUT_Q || "Sair?";
     document.getElementById('modal-btn-ok').innerText = msgs.b_back ? msgs.b_back.toUpperCase() : "VOLTAR"; 
     document.getElementById('modal-btn-confirm').style.display = "inline-block";
     document.getElementById('modal-btn-confirm').innerText = msgs.b_yes || "SIM";
