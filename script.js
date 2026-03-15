@@ -1,12 +1,29 @@
 // ===================================================================================
-// ⚠️ COLE AQUI A SUA URL BLINDADA DO GOOGLE APPS SCRIPT
+// ⚠️ SUA URL BLINDADA DO GOOGLE APPS SCRIPT
 // ===================================================================================
 const API_URL = "https://script.google.com/macros/s/AKfycbwS8MljNhwEKSLNYP4X9-85LDOSvZd_KAHmvmuETqrlBWcYRmyfbayxF14_EHjiExos7Q/exec";
 
-// Motor de conexão com a API do Google (BLINDADO E COM TRIAGEM DE ERROS)
-async function apiCall(action, data) {
+// --- VARIÁVEIS GLOBAIS DO SISTEMA (CORRIGIDAS PARA RECUPERAÇÃO DE SENHA) ---
+const urlParams = new URLSearchParams(window.location.search);
+const urlAction = urlParams.get('ac') || "";
+const urlEmail = urlParams.get('em') || ""; 
+
+let I18N = {}; 
+let detectedLang = (navigator.language || "en").split("-")[0];
+let userEmailCache = urlEmail; // Salva o e-mail da URL na memória
+const passRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$/;
+
+const FALLBACK = {
+    "ERR_NET": "Sem internet. Verifique sua conexão.",
+    "ERR_OFFLINE": "Sem internet. Verifique seu Wi-Fi ou 4G.",
+    "ERR_SERVER_BLOCK": "Erro no servidor. O Google bloqueou a conexão ou falhou ao processar.",
+    "ERR_FETCH_FAIL": "Falha de comunicação com o servidor.",
+    "ERR_UNKNOWN": "Falha no sistema. Tente novamente."
+};
+
+// Motor de conexão com a API do Google (CORRIGIDO PARA ENVIAR A AÇÃO CERTA)
+async function apiCall(backendAction, specificType, data) {
     if (!navigator.onLine) {
-        console.error("❌ Erro: Usuário sem conexão de rede.");
         return { success: false, msg: "ERR_OFFLINE" }; 
     }
 
@@ -14,7 +31,10 @@ async function apiCall(action, data) {
         let res = await fetch(API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({action: action, payload: {type: action, data: data, email: userEmailCache}})
+            body: JSON.stringify({
+                action: backendAction, 
+                payload: { type: specificType, data: data, email: userEmailCache }
+            })
         });
         
         const textoBruto = await res.text();
@@ -22,7 +42,7 @@ async function apiCall(action, data) {
         try {
             return JSON.parse(textoBruto);
         } catch (errParsing) {
-            console.error("❌ O Google bloqueou e devolveu HTML/Lixo:", textoBruto);
+            console.error("❌ O Google retornou HTML de erro:", textoBruto);
             return { success: false, msg: "ERR_SERVER_BLOCK" }; 
         }
     } catch(e) {
@@ -56,29 +76,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// --- VARIÁVEIS GLOBAIS DO SISTEMA (CORRIGIDAS PARA RECUPERAÇÃO DE SENHA) ---
-const urlParams = new URLSearchParams(window.location.search);
-const urlAction = urlParams.get('ac') || "";
-const urlEmail = urlParams.get('em') || ""; // <--- AGORA ELE PUXA O E-MAIL DO LINK!
-
-let I18N = {}; 
-let detectedLang = (navigator.language || "en").split("-")[0];
-let userEmailCache = urlEmail; // <--- SALVA O E-MAIL NA MEMÓRIA MESMO EM ABA NOVA
-const passRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$/;
-
-const FALLBACK = {
-    "ERR_NET": "Sem internet. Verifique sua conexão.",
-    "ERR_OFFLINE": "Sem internet de verdade. Verifique seu Wi-Fi ou 4G.",
-    "ERR_SERVER_BLOCK": "O servidor bloqueou a conexão. O Google não retornou dados válidos.",
-    "ERR_FETCH_FAIL": "Falha ao alcançar o servidor da API.",
-    "ERR_UNKNOWN": "Falha no sistema. Tente novamente."
-};
-
 function initApp() {
     console.log("🔄 Buscando traduções...");
     
-    apiCall('getI18nData', {}).then(dadosPlanilha => {
-        if(dadosPlanilha && dadosPlanilha.pt) {
+    // Rota: getI18nData (Sem subtipo)
+    apiCall('getI18nData', null, {}).then(dadosPlanilha => {
+        if(dadosPlanilha && dadosPlanilha.pt && !dadosPlanilha.success === false) {
             console.log("✅ Traduções carregadas!");
             I18N = dadosPlanilha;
         } else {
@@ -87,7 +90,6 @@ function initApp() {
         if(!I18N[detectedLang]) I18N[detectedLang] = {};
         aplicarTraducoes(); 
         
-        // Se a URL mandar abrir o reset, ele abre direto
         if (urlAction === 'reset') {
             show_sec('sec-reset');
         }
@@ -95,7 +97,7 @@ function initApp() {
 }
 
 function aplicarTraducoes() {
-    const MSGS = I18N[detectedLang] || I18N["en"] || I18N[Object.keys(I18N)[0]];
+    const MSGS = I18N[detectedLang] || I18N["en"] || I18N[Object.keys(I18N)[0]] || FALLBACK;
     if (!MSGS) return; 
 
     const textMap = { 
@@ -160,7 +162,8 @@ function run_login(btn) {
     btn.disabled = true; 
     btn.innerText = msgs.WAIT || "AGUARDE";
 
-    apiCall('user_manager', {email: e, pass: p}).then(res => {
+    // CORRIGIDO: Agora manda 'login' como subtipo
+    apiCall('user_manager', 'login', {email: e, pass: p}).then(res => {
         btn.disabled = false; 
         btn.innerText = msgs.b_login || "ENTRAR";
 
@@ -173,7 +176,7 @@ function run_login(btn) {
             document.getElementById('dash-intro').innerText = msgs.INTRO || "";
             limparCampos(['l-email', 'l-pass']);
         } else {
-            let msgFinal = msgs[res.msg] || res.msg || msgs.ERR_UNKNOWN || "Erro";
+            let msgFinal = msgs[res.msg] || FALLBACK[res.msg] || res.msg || msgs.ERR_UNKNOWN || "Erro";
             if (res.remaining) { msgFinal = msgFinal.replace("{n}", res.remaining); }
             notify(msgFinal);
             limparCampos(['l-email', 'l-pass']);
@@ -198,7 +201,8 @@ function run_register(btn) {
     btn.disabled = true;
     btn.innerText = msgs.WAIT || "AGUARDE";
 
-    apiCall('user_manager', {name: n, email: e, pass: p, lang: detectedLang}).then(res => {
+    // CORRIGIDO: Agora manda 'register' como subtipo
+    apiCall('user_manager', 'register', {name: n, email: e, pass: p, lang: detectedLang}).then(res => {
         btn.disabled = false;
         btn.innerText = msgs.b_reg || "REGISTRAR"; 
         if(res.success) {
@@ -206,7 +210,7 @@ function run_register(btn) {
             limparCampos(['r-name', 'r-email', 'r-pass', 'r-pass-confirm']);
             setTimeout(() => { show_sec('sec-login'); }, 1500);
         } else {
-            let msgFinal = msgs[res.msg] || res.msg || msgs.ERR_UNKNOWN || "Erro";
+            let msgFinal = msgs[res.msg] || FALLBACK[res.msg] || res.msg || msgs.ERR_UNKNOWN || "Erro";
             if (res.remaining) { msgFinal = msgFinal.replace("{n}", res.remaining); }
             notify(msgFinal);
         }
@@ -223,7 +227,8 @@ function run_forgot(btn) {
     btn.disabled = true; 
     btn.innerText = msgs.WAIT || "AGUARDE";
 
-    apiCall('user_manager', {email: e, lang: detectedLang}).then(res => {
+    // CORRIGIDO: Agora manda 'forgot' como subtipo
+    apiCall('user_manager', 'forgot', {email: e, lang: detectedLang}).then(res => {
         btn.disabled = false; 
         btn.innerText = msgs.b_forgot || "RECUPERAR SENHA";
 
@@ -237,7 +242,7 @@ function run_forgot(btn) {
                 closeModal(); show_sec('sec-reset'); okBtn.onclick = closeModal; 
             };
         } else {
-            let msgFinal = msgs[res.msg] || res.msg || "Erro";
+            let msgFinal = msgs[res.msg] || FALLBACK[res.msg] || res.msg || "Erro";
             if (res.remaining) { msgFinal = msgFinal.replace("{n}", res.remaining); }
             notify(msgFinal); 
 
@@ -264,7 +269,8 @@ function run_reset(btn) {
     btn.disabled = true; 
     btn.innerText = msgs.WAIT || "AGUARDE";
 
-    apiCall('user_manager', {email: userEmailCache, token: t, new_pass: p}).then(res => {
+    // CORRIGIDO: Agora manda 'reset' como subtipo. E o Backend NÃO vai mais crashear.
+    apiCall('user_manager', 'reset', {email: userEmailCache, token: t, new_pass: p}).then(res => {
         btn.disabled = false; 
         btn.innerText = msgs.b_reset || "REDEFINIR";
         
@@ -273,7 +279,7 @@ function run_reset(btn) {
             limparCampos(['rs-token', 'rs-pass', 'rs-pass-confirm']); 
             show_sec('sec-login'); 
         } else {
-            let msgFinal = msgs[res.msg] || res.msg || msgs.ERR_UNKNOWN || "Erro";
+            let msgFinal = msgs[res.msg] || FALLBACK[res.msg] || res.msg || msgs.ERR_UNKNOWN || "Erro";
             if (res.remaining) { msgFinal = msgFinal.replace("{n}", res.remaining); }
             notify(msgFinal);
             limparCampos(['rs-token', 'rs-pass', 'rs-pass-confirm']);
@@ -287,7 +293,7 @@ function run_reset(btn) {
 }
 
 function notify(m) {
-    const msgs = I18N[detectedLang] || I18N["en"] || {};
+    const msgs = I18N[detectedLang] || I18N["en"] || FALLBACK;
     document.getElementById('modal-text').innerText = m;
     document.getElementById('modal-btn-ok').innerText = "OK";
     document.getElementById('modal-btn-confirm').style.display = "none";
@@ -295,7 +301,7 @@ function notify(m) {
 }
 
 function askLogout() {
-    const msgs = I18N[detectedLang] || I18N["en"] || {};
+    const msgs = I18N[detectedLang] || I18N["en"] || FALLBACK;
     document.getElementById('modal-text').innerText = msgs.LOGOUT_Q || "Sair?";
     document.getElementById('modal-btn-ok').innerText = msgs.b_back ? msgs.b_back.toUpperCase() : "VOLTAR"; 
     document.getElementById('modal-btn-confirm').style.display = "inline-block";
@@ -358,7 +364,7 @@ function run_activation(btn) {
     if(!key) return notify("Digite uma chave.");
     btn.disabled = true; btn.innerText = "AGUARDE...";
 
-    apiCall('activateLicense', {key: key}).then(res => {
+    apiCall('activateLicense', null, {key: key}).then(res => {
         btn.disabled = false; btn.innerText = "ATIVAR";
         if(res.success) { 
             notify("Sucesso!"); 
@@ -395,7 +401,7 @@ function saveProfile(btn) {
         photoMime: photoMimeType
     };
 
-    apiCall('saveNewProfile', formData).then(res => {
+    apiCall('saveNewProfile', null, formData).then(res => {
         btn.disabled = false;
         btn.innerText = "SALVAR E CONTINUAR";
         if (res.success) {
