@@ -1,7 +1,7 @@
 // ===================================================================================
 // ⚠️ COLE AQUI A SUA URL BLINDADA DO GOOGLE APPS SCRIPT
 // ===================================================================================
-const API_URL = "https://script.google.com/macros/s/AKfycbzh7Tfnc869m31e6zxAGH4c0PtGE7hxywocCNHMdF4-AojyAs_loce_glpHATQI4H-oOg/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbxUpj0SSUi4j9hheTxh-OYUssAN6_BHmQ_YWuelqgi7-hCrpGjU8uGe0boPiQ3MvUKzOQ/exec";
 
 // Motor de conexão com a API do Google (Netlify -> Google)
 async function apiCall(action, data) {
