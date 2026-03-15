@@ -1,7 +1,7 @@
 // ===================================================================================
 // ⚠️ COLE AQUI A SUA URL BLINDADA DO GOOGLE APPS SCRIPT
 // ===================================================================================
-const API_URL = "https://script.google.com/macros/s/AKfycbxUpj0SSUi4j9hheTxh-OYUssAN6_BHmQ_YWuelqgi7-hCrpGjU8uGe0boPiQ3MvUKzOQ/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbwS8MljNhwEKSLNYP4X9-85LDOSvZd_KAHmvmuETqrlBWcYRmyfbayxF14_EHjiExos7Q/exec";
 
 // Motor de conexão com a API do Google (BLINDADO E COM TRIAGEM DE ERROS)
 async function apiCall(action, data) {
