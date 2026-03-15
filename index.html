@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/inglesnoar2025/essentialenglish/main/essentialenglish%20nova%20modo%20escuro.png">
+  <title>Essential English</title>
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="intro-overlay">
+    <video id="vid-player" autoplay muted playsinline style="width: 100%; max-width: 600px;">
+      <source src="https://raw.githubusercontent.com/inglesnoar2025/essentialenglish/main/essentialenglish%20intro.mp4" type="video/mp4">
+    </video>
+  </div>
+
+  <div id="logo-wrapper">
+    <img src="https://raw.githubusercontent.com/inglesnoar2025/essentialenglish/main/essentialenglish%20nova%20modo%20claro.png" class="app-logo logo-claro">
+    <img src="https://raw.githubusercontent.com/inglesnoar2025/essentialenglish/main/essentialenglish%20nova%20modo%20escuro.png" class="app-logo logo-escuro">
+  </div>
+
+  <div id="theme-switch" onclick="toggleDarkMode()">
+    <span id="theme-icon">🌙</span>
+  </div>
+
+  <div id="main-auth">
+    <div class="auth-container">
+      
+      <div id="sec-login" class="card">
+        <h2 id="t-login"></h2>
+        <input type="email" id="l-email">
+        <div class="pass-group">
+          <input type="password" id="l-pass">
+          <span class="eye slash" onclick="toggle_pass('l-pass', this)">👁️</span>
+        </div>
+        <button onclick="run_login(this)" id="b-login"></button>
+        <p onclick="show_sec('sec-register')" id="link-reg"></p>
+        <p onclick="show_sec('sec-forgot')" id="link-forgot"></p>
+      </div>
+
+      <div id="sec-register" class="card" style="display:none">
+        <h2 id="t-reg"></h2>
+        <input type="text" id="r-name">
+        <input type="email" id="r-email">
+        <div class="pass-group">
+          <input type="password" id="r-pass">
+          <span class="eye slash" onclick="toggle_pass('r-pass', this)">👁️</span>
+        </div>
+        <div class="pass-group">
+          <input type="password" id="r-pass-confirm">
+          <span class="eye slash" onclick="toggle_pass('r-pass-confirm', this)">👁️</span>
+        </div>
+        <button onclick="run_register(this)" id="b-reg"></button>
+        <p onclick="show_sec('sec-login')" id="link-back"></p>
+      </div>
+
+      <div id="sec-forgot" class="card" style="display:none">
+        <h2 id="t-forgot"></h2>
+        <input type="email" id="f-email">
+        <button onclick="run_forgot(this)" id="b-forgot"></button>
+        <p onclick="show_sec('sec-login')" id="link-back-2"></p>
+      </div>
+
+      <div id="sec-reset" class="card" style="display:none">
+        <h2 id="t-reset"></h2>
+        <input type="text" id="rs-token">
+        <div class="pass-group">
+          <input type="password" id="rs-pass">
+          <span class="eye slash" onclick="toggle_pass('rs-pass', this)">👁️</span>
+        </div>
+        <div class="pass-group">
+          <input type="password" id="rs-pass-confirm">
+          <span class="eye slash" onclick="toggle_pass('rs-pass-confirm', this)">👁️</span>
+        </div>
+        <button onclick="run_reset(this)" id="b-reset"></button>
+        <p onclick="show_sec('sec-login')" id="link-back-3"></p>
+      </div>
+    
+      <div id="sec-profile" class="card" style="display:none">
+        <h2 id="t-profile">Complete seu Perfil</h2>
+        
+        <div class="profile-upload">
+            <label for="prof-photo-input" class="profile-pic-label">
+                <span class="cam-icon">📷</span>
+                <img id="preview-img" alt="Foto">
+            </label>
+            <input type="file" id="prof-photo-input" accept="image/*" onchange="previewPhoto(this)">
+            <p style="font-size:12px; color:var(--txt-cor); opacity:0.7; margin-top:5px;">Toque para adicionar foto</p>
+        </div>
+
+        <input type="text" id="prof-fullname" placeholder="Nome Completo">
+        
+        <div style="display:flex; gap:10px; width:100%;">
+            <input type="date" id="prof-birth" style="width:50% !important;" placeholder="Data Nasc.">
+            <select id="prof-gender" style="width:50% !important;">
+                <option value="" disabled selected>Sexo</option>
+                <option value="M">Masculino</option>
+                <option value="F">Feminino</option>
+                <option value="O">Outro</option>
+                <option value="N">Prefiro não dizer</option>
+            </select>
+        </div>
+
+        <input type="tel" id="prof-phone" placeholder="Telefone / Celular">
+        
+        <div class="contact-channels">
+            <label class="channel-opt"><input type="checkbox" id="chk-wa"> WhatsApp</label>
+            <label class="channel-opt"><input type="checkbox" id="chk-tg"> Telegram</label>
+            <label class="channel-opt"><input type="checkbox" id="chk-sms"> SMS</label>
+        </div>
+
+        <input type="email" id="prof-alt-email" placeholder="Email Alternativo (Opcional)">
+
+        <button onclick="saveProfile(this)" id="b-save-profile">SALVAR E CONTINUAR</button>
+        <p onclick="show_sec('sec-dashboard')" style="color:var(--h2-cor); cursor:pointer; text-align:center; margin-top:15px; font-weight:bold;">Voltar ao Dashboard</p>
+      </div> 
+    </div>
+  </div>
+
+  <div id="sec-dashboard" style="display:none">
+    <header>
+      <h1 id="dash-title">Essential English</h1>
+      <button id="b-logout" onclick="askLogout()" style="width: auto; background: #d93025; padding: 5px 15px; margin:0;"></button>
+    </header>
+    <main class="dash-main">
+      <div class="dash-card">
+        <h2 id="dash-welcome"></h2>
+        <p id="dash-intro"></p>
+        <hr>
+        
+        <div id="license-area" style="margin-top: 20px; padding: 20px; background: #f1f3f4; border-radius: 8px;">
+            <h3 id="t-lic-title" style="margin-top:0; color: var(--h2-cor);"></h3> 
+            <p id="t-lic-desc" style="font-size: 14px; margin-bottom: 10px;"></p>
+            
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <input type="text" id="lic-key-input" style="flex:1; margin:0;" placeholder="">
+                <button id="b-lic-activate" onclick="run_activation(this)" style="width: auto; margin:0;"></button>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top:20px;">
+           <div style="padding:20px; border:1px solid #ddd; border-radius:10px; text-align:center;">📚 <span id="dash-mod-1"></span></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="wl-modal" class="modal-overlay">
+    <div class="modal-content">
+      <p id="modal-text"></p>
+      <button onclick="closeModal()" id="modal-btn-ok">OK</button>
+      <button onclick="doLogout()" id="modal-btn-confirm" style="display:none; background:#d93025; margin-top:10px;"></button>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+
+</body>
+</html>
